@@ -69,6 +69,34 @@ def is_allowed_channel(ctx):
 def is_admin(ctx):
     return ctx.author.id in ADMINS
 
+# Custom Help Command with Embed
+class CustomHelpCommand(commands.HelpCommand):
+    def __init__(self):
+        super().__init__()
+
+    async def send_bot_help(self, mapping):
+        ctx = self.context
+        embed = discord.Embed(title="Help - Available Commands", color=discord.Color.blue())
+        embed.description = "Here are the commands you can use with this bot. Admin-only commands are marked with 🛠️."
+
+        for cog, commands in mapping.items():
+            for command in commands:
+                if command.hidden:
+                    continue
+                if is_admin(ctx) or command.name not in ['add', 'remove', 'clear', 'reset', 'force_reset']:
+                    is_admin_command = command.name in ['add', 'remove', 'clear', 'reset', 'force_reset']
+                    admin_icon = " 🛠️" if is_admin_command else ""
+                    embed.add_field(name=f"`{ctx.prefix}{command.name}`{admin_icon}", value=command.help or "No description", inline=False)
+
+        await ctx.send(embed=embed)
+
+    async def send_command_help(self, command):
+        ctx = self.context
+        embed = discord.Embed(title=f"Help - {command.name}", description=command.help or "No description", color=discord.Color.blue())
+        await ctx.send(embed=embed)
+
+bot.help_command = CustomHelpCommand()
+
 # $check command - Check your balance or another user's balance
 @bot.command(name='check', help='Check your current Aura balance or another user\'s balance.')
 @commands.check(is_allowed_channel)
@@ -82,6 +110,58 @@ async def check_aura(ctx, member: discord.Member = None):
             await ctx.send(f"{user.mention} has {balance} Aura.")
         else:
             await ctx.send(f"{user.mention} does not have an account. Use $new to create one.")
+
+# $rob command - Rob another user with a random success chance
+@bot.command(name='rob', help='Rob another user for a percentage of their Aura with a random chance of success.')
+@commands.check(is_allowed_channel)
+@commands.cooldown(1, ROB_COOLDOWN, BucketType.user)  # Cooldown taken from config.yml
+async def rob(ctx, member: discord.Member):
+    async with command_locks['rob']:
+        print(f"Rob command invoked by {ctx.author} to rob {member}")  # Debug statement
+        robber_id = str(ctx.author.id)
+        victim_id = str(member.id)
+
+        if robber_id not in users:
+            await ctx.send(f"{ctx.author.mention} You do not have an account. Use $new to create one.")
+            return
+
+        if victim_id not in users:
+            await ctx.send(f"{ctx.author.mention} The user you are trying to rob does not have an account.")
+            return
+
+        if robber_id == victim_id:
+            await ctx.send(f"{ctx.author.mention} You cannot rob yourself.")
+            return
+
+        robber_balance = users[robber_id]['balance']
+        victim_balance = users[victim_id]['balance']
+
+        if victim_balance == 0:
+            await ctx.send(f"{ctx.author.mention} The user you are trying to rob has no Aura.")
+            return
+
+        rob_amount = math.floor(ROB_AMOUNT_PERCENT * victim_balance)
+        success_chance = random.random() < random.random()  # Random success chance
+
+        if success_chance:
+            users[robber_id]['balance'] += rob_amount
+            users[victim_id]['balance'] -= rob_amount
+            save_users()
+            await ctx.send(f"{member.mention}, you just got fanum taxed by {ctx.author.mention}!")
+        else:
+            fail_amount = math.floor(FAIL_DEDUCTION_PERCENT * robber_balance)
+            users[robber_id]['balance'] -= fail_amount
+            save_users()
+            await ctx.send(f"{ctx.author.mention}, damn bro ain't him - {fail_amount} Aura!")
+
+@rob.error
+async def rob_error(ctx, error):
+    if isinstance(error, commands.BadArgument):
+        await ctx.send(f"{ctx.author.mention} Please enter a valid user mention or user ID.")
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send(f"{ctx.author.mention} Please specify a user to rob.")
+    elif isinstance(error, commands.CommandOnCooldown):
+        await ctx.send(f"{ctx.author.mention} You can use this command again in {round(error.retry_after, 2)} seconds.")
 
 # $leaderboard / $top command - Show the top 10 users
 @bot.command(name='leaderboard', aliases=['top'], help='Show the top 10 users in the leaderboard.')

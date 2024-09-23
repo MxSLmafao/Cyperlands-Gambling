@@ -1,0 +1,27 @@
+# Your bot token
+token: "YOUR_DISCORD_BOT_TOKEN"
+
+# The default currency balance for new users
+default_currency: 100
+
+# List of admin user IDs (Discord user IDs)
+admins:
+  - 123456789012345678  # Replace with actual admin user IDs
+  - 987654321098765432
+
+# Allowed channel IDs where bot commands can be used (for non-admin commands)
+allowed_channels:
+  - 123456789012345678  # Replace with actual channel IDs
+  - 234567890123456789
+
+# Rob command configuration
+rob:
+  rob_amount: 0.2  # 20% of the target's balance
+  fail_deduction: 0.2  # 20% penalty if the rob fails
+  cooldown: 50  # Cooldown time in seconds
+
+# Lottery configuration
+lottery_ticket_price: 200  # Cost of one lottery ticket in Aura
+
+# Channel ID to forward DMs sent to the bot
+dm_forward_channel_id: 1096863490083406004  # Replace with the actual channel ID
